@@ -3,12 +3,41 @@ const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { token } = require('./config.json');
 const fs = require('fs');
 const path = require('path');
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs
+	.readdirSync(eventsPath)
+	.filter((file) => file.endsWith('.js'));
+// Require Sequelize
+const User = require('./models/user');
+const Inventory = require('./models/inventory');
+const Comp = require('./models/comp');
+const Perso = require('./models/perso');
+
+const db = require('./database/database');
+const { Player } = require('discord-player');
+
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+});
 
 // When the client is ready, run this code (only once)
 client.once('ready', () => {
-	console.log('Ready!');
+	// console.log(`Logged in as ${client.user.tag}!`);
+	db.authenticate()
+		.then(() => {
+			// equivalent to: SELECT * FROM tags WHERE name = 'tagName' LIMIT 1;
+			// const tag = await Tags.findOne({ where: { name: tagName } });
+			// equivalent to: UPDATE tags SET usage_count = usage_count + 1 WHERE name = 'tagName';
+			// tag.increment('usage_count');
+			User.sync();
+			Comp.sync();
+			Inventory.sync();
+			Perso.sync();
+
+			console.log(`Logged in as ${client.user.tag}!`);
+		})
+		.catch((err) => console.log(err));
 });
 
 client.commands = new Collection();
@@ -32,21 +61,18 @@ for (const file of commandFiles) {
 	}
 }
 
-client.on('interactionCreate', async (interaction) => {
-	if (!interaction.isChatInputCommand()) return;
-
-	const { commandName } = interaction;
-
-	if (commandName === 'help') {
-		await interaction.reply('C\'est bien moi');
+for (const file of eventFiles) {
+	const filePath = path.join(eventsPath, file);
+	const event = require(filePath);
+	if (event.once) {
+		client.once(event.name, (...args) => event.execute(...args));
 	}
-	else if (commandName === 'roll') {
-		await interaction.reply(Math.floor(Math.random() * 101).toString());
+	else {
+		client.on(event.name, (...args) => event.execute(...args));
 	}
-	else if (commandName === 'user') {
-		await interaction.reply('User info.');
-	}
-});
-
+}
+client.player = new Player(client);
 // Login to Discord with your client's token
 client.login(token);
+
+module.exports = { client };
