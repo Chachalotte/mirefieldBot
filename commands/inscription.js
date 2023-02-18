@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const User = require('../models/user');
+
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('inscription')
@@ -13,6 +14,7 @@ module.exports = {
 
 		try {
 			// equivalent to: INSERT INTO tags (name, description, username) values (?, ?, ?);
+
 			const user = await User.create({
 				id: userId,
 				pseudo: username,
@@ -20,9 +22,7 @@ module.exports = {
 				avatar: avatar,
 			});
 
-			return interaction.reply(
-				`Bienvenue à Mirefield, ${user.pseudo}, ${user.id}`,
-			);
+			return interaction.reply(`Bienvenue à Mirefield, ${user.pseudo}.`);
 		}
 		catch (error) {
 			if (error.name === 'SequelizeUniqueConstraintError') {
@@ -30,7 +30,7 @@ module.exports = {
 			}
 			else {
 				console.log(error);
-				return interaction.reply('Erreur inconnue, désolé, c\'est bête hein ?');
+				return interaction.reply('Erreur inconnue, ouin');
 			}
 		}
 	},

@@ -15,7 +15,6 @@ module.exports = sequelize.define('user', {
 		primaryKey: true,
 	},
 	pseudo: Sequelize.STRING,
-	inv_id: { type: Sequelize.INTEGER, unique: true },
 	perso_id: { type: Sequelize.INTEGER, unique: true },
 	avatar: Sequelize.STRING,
 });

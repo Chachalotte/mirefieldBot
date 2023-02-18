@@ -19,6 +19,8 @@ module.exports = sequelize.define('perso', {
 	prenom: Sequelize.STRING,
 	description: Sequelize.TEXT,
 	compPerso: Sequelize.TEXT,
+	money: Sequelize.INTEGER,
+	inv_id: Sequelize.INTEGER,
 
 	avatar: Sequelize.STRING,
 });
