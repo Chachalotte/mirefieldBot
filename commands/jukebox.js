@@ -49,6 +49,9 @@ module.exports = {
 		)
 		.addSubcommand((subcommand) =>
 			subcommand.setName('skip').setDescription('Skip la musique'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand.setName('pause').setDescription('Pause la musique'),
 		),
 	async execute(interaction) {
 		const client = interaction.client;
@@ -139,21 +142,30 @@ module.exports = {
 			});
 		}
 		if (interaction.options.getSubcommand() === 'queue') {
-			return await interaction.reply('ok');
+			const queue = useQueue(interaction.guild.id);
+			const tracks = queue.tracks.toArray(); // Converts the queue into a array of tracks
+			const currentTrack = queue.currentTrack; // Gets the current track being played
+			return await interaction.reply(`${currentTrack}`);
 		}
 		if (interaction.options.getSubcommand() === 'piste') {
 			return await interaction.reply('ok');
 		}
 		if (interaction.options.getSubcommand() === 'skip') {
 			queue.node.skip();
-
-			return await interaction.reply('ok');
+			return await interaction.reply('La musique en cours a été skip.');
 		}
 		if (interaction.options.getSubcommand() === 'refresh') {
-			const progressBar = queue.createProgressBar();
-			return await interaction.followUp({
-				content: `La playlist a été vidée. | ${progressBar}`,
-			});
+			queue.delete();
+			return await interaction.reply('La playlist s`est faites détruire');
+		}
+		if (interaction.options.getSubcommand() === 'pause') {
+			queue.node.setPaused(!queue.node.isPaused()); // isPaused() returns true if that player is already paused
+			if (queue.node.isPaused() === true) {
+				return await interaction.reply('Mis en pause');
+			}
+			if (queue.node.isPaused() === false) {
+				return await interaction.reply('Plus en pause');
+			}
 		}
 	},
 };
