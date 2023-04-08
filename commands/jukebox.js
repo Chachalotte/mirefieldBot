@@ -1,4 +1,4 @@
-const { joinVoiceChannel } = require('@discordjs/voice');
+const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
 const { SlashCommandBuilder } = require('discord.js');
 const { Player } = require('discord-player');
 
@@ -8,12 +8,14 @@ module.exports = {
 		.setDescription('Chercher des musique via youtube / soundcloud ;)')
 		.addSubcommand((subcommand) =>
 			subcommand
-				.setName('song')
-				.setDescription('Loads a single song from a url')
+				.setName('play')
+				.setDescription(
+					'Permets de jouer une musique et l\'ajouter à la queue existante.',
+				)
 				.addStringOption((option) =>
 					option
-						.setName('url')
-						.setDescription('Lien de la musique (Youtube / Soundcloud)')
+						.setName('song_name')
+						.setDescription('Nom de la musique (Youtube / Soundcloud)')
 						.setRequired(true),
 				),
 		)
@@ -32,24 +34,64 @@ module.exports = {
 		)
 		.addSubcommand((subcommand) =>
 			subcommand
-				.setName('search')
-				.setDescription('Chercher une musique')
-				.addStringOption((option) =>
-					option
-						.setName('searchterms')
-						.setDescription('nom du terme')
-						.setRequired(true),
-				),
+				.setName('queue')
+				.setDescription('Afficher la queue de la musique !'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand
+				.setName('piste')
+				.setDescription('Afficher la musique en train d\'être jouée.'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand
+				.setName('refresh')
+				.setDescription('Remettre la playlist à zéro'),
 		),
 	async execute(interaction) {
-		if (interaction.options.getSubcommand() === 'song') {
-			const urlLink = interaction.options.getString('url') || null;
+		const client = interaction.client;
+		const player = client.player;
+		await interaction.deferReply();
 
-			const client = interaction.client;
-			const player = new Player(client);
-			player.on('trackStart', (queue, track) =>
-				queue.metadata.channel.send(`🎶 | Now playing **${track.title}**!`),
+		player.on('connectionCreate', (queue) => {
+			queue.connection.voiceConnection.on(
+				'stateChange',
+				(oldState, newState) => {
+					if (
+						oldState.status === VoiceConnectionStatus.Ready &&
+						newState.status === VoiceConnectionStatus.Connecting
+					) {
+						queue.connection.voiceConnection.configureNetworking();
+					}
+				},
 			);
+		});
+
+		let queue = player.getQueue(interaction.guildId);
+
+		if (interaction.options.getSubcommand() === 'play') {
+			const urlLink = interaction.options.getString('song_name') || null;
+			if (!queue || !queue.playing) {
+				queue = player.createQueue(interaction.guild, {
+					ytdlOptions: {
+						filter: 'audioonly',
+						highWaterMark: 1 << 30,
+						dlChunkSize: 0,
+						quality: 'highestaudio',
+					},
+					metadata: interaction.channel,
+				});
+			}
+
+			const track = await player
+				.search(urlLink, {
+					requestedBy: interaction.user,
+				})
+				.then((x) => x.tracks[0]);
+			if (!track) {
+				return await interaction.followUp({
+					content: `❌ | La musique **${urlLink}** n'a pas été trouvée!`,
+				});
+			}
 
 			if (!interaction.member.voice.channelId) {
 				return await interaction.reply({
@@ -67,14 +109,6 @@ module.exports = {
 					ephemeral: true,
 				});
 			}
-			const queue = player.createQueue(interaction.guild, {
-				ytdlOptions: {
-					filter: 'audioonly',
-					highWaterMark: 1 << 30,
-					dlChunkSize: 0,
-				},
-				metadata: interaction.channel,
-			});
 
 			// verify vc connection
 			try {
@@ -90,22 +124,26 @@ module.exports = {
 				});
 			}
 
-			await interaction.deferReply();
-			const track = await player
-				.search(urlLink, {
-					requestedBy: interaction.user,
-				})
-				.then((x) => x.tracks[0]);
-			if (!track) {
-				return await interaction.followUp({
-					content: `❌ | Track **${urlLink}** not found!`,
-				});
-			}
+			// const length = queue.length;
+
+			// queue.insert(track, length);
 
 			queue.play(track);
 
 			return await interaction.followUp({
 				content: `⏱️ | Et on va jouer... **${track.title}**!`,
+			});
+		}
+		if (interaction.options.getSubcommand() === 'queue') {
+			return await interaction.reply('ok');
+		}
+		if (interaction.options.getSubcommand() === 'piste') {
+			return await interaction.reply('ok');
+		}
+		if (interaction.options.getSubcommand() === 'refresh') {
+			const progressBar = queue.createProgressBar();
+			return await interaction.followUp({
+				content: `La playlist a été vidée. | ${progressBar}`,
 			});
 		}
 	},

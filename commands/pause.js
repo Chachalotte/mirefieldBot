@@ -1,5 +1,5 @@
 const { joinVoiceChannel } = require('@discordjs/voice');
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
 const { Player } = require('discord-player');
 
 module.exports = {
@@ -7,18 +7,29 @@ module.exports = {
 		.setName('pause')
 		.setDescription('Mettre en pause la musique'),
 	async execute(interaction) {
-		await interaction.deferReply();
-		const client = interaction.client;
+		if (
+			interaction.member.permissions.has([
+				PermissionsBitField.Flags.KickMembers,
+				PermissionsBitField.Flags.BanMembers,
+			])
+		) {
+			await interaction.deferReply();
+			const client = interaction.client;
+			const player = client.player;
 
-		const queue = client.player.getQueue(interaction.guildId);
-		if (!queue || !queue.playing) {
+			const queue = player.getQueue(interaction.guildId);
+			if (!queue || !queue.playing) {
+				return void interaction.followUp({
+					content: '❌ | Pas de musique en cours!',
+				});
+			}
+			const paused = queue.setPaused(true);
 			return void interaction.followUp({
-				content: '❌ | No music is being played!',
+				content: paused ? '⏸ | Mis en pause!' : '❌ | Oups ! J\'ai bugué!',
 			});
 		}
-		const paused = queue.setPaused(true);
-		return void interaction.followUp({
-			content: paused ? '⏸ | Paused!' : '❌ | Something went wrong!',
-		});
+		else {
+			return interaction.reply('Vous n\'avez pas les permissionss');
+		}
 	},
 };

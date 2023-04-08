@@ -18,8 +18,8 @@ module.exports = {
 		.addIntegerOption((option) =>
 			option
 				.setName('multiplicateur')
-				.setDescription('Multiplicateur à ajouter au jet de dé (en pourcent !)')
-				.setMinValue(100)
+				.setDescription('Multiplicateur à ajouter au bonus du jet de dé (en pourcent !)')
+				.setMinValue(0)
 				.setMaxValue(200),
 		),
 
@@ -46,7 +46,7 @@ module.exports = {
 			);
 		}
 		else {
-			let result = (rand + bonus) * (multiplicateur / 100);
+			let result = rand + ((bonus * multiplicateur) / 100);
 			result = Math.round(result);
 			await interaction.reply(
 				`**Lancer de dé sur ${roll} :** \n ` +
