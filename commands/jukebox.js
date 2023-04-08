@@ -1,6 +1,6 @@
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
 const { SlashCommandBuilder } = require('discord.js');
-const { Player } = require('discord-player');
+const { useMasterPlayer, Track, useQueue } = require('discord-player');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -46,56 +46,63 @@ module.exports = {
 			subcommand
 				.setName('refresh')
 				.setDescription('Remettre la playlist à zéro'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand.setName('skip').setDescription('Skip la musique'),
 		),
 	async execute(interaction) {
 		const client = interaction.client;
-		const player = client.player;
-		await interaction.deferReply();
-
-		player.on('connectionCreate', (queue) => {
-			queue.connection.voiceConnection.on(
+		// const player = client.player;
+		const player = useMasterPlayer();
+		player.events.on('connection', (queue) => {
+			queue.dispatcher.voiceConnection.on(
 				'stateChange',
 				(oldState, newState) => {
-					if (
-						oldState.status === VoiceConnectionStatus.Ready &&
-						newState.status === VoiceConnectionStatus.Connecting
-					) {
-						queue.connection.voiceConnection.configureNetworking();
-					}
+					const oldNetworking = Reflect.get(oldState, 'networking');
+					const newNetworking = Reflect.get(newState, 'networking');
+
+					const networkStateChangeHandler = (
+						oldNetworkState,
+						newNetworkState,
+					) => {
+						const newUdp = Reflect.get(newNetworkState, 'udp');
+						clearInterval(newUdp?.keepAliveInterval);
+					};
+
+					oldNetworking?.off('stateChange', networkStateChangeHandler);
+					newNetworking?.on('stateChange', networkStateChangeHandler);
 				},
 			);
 		});
-
-		let queue = player.getQueue(interaction.guildId);
-
+		const queue = await client.player.nodes.create(interaction.guild, {
+			metadata: {
+				channel: interaction.channel,
+				client: interaction.guild.members.me,
+				requestedBy: interaction.user,
+			},
+			selfDeaf: true,
+		});
 		if (interaction.options.getSubcommand() === 'play') {
 			const urlLink = interaction.options.getString('song_name') || null;
-			if (!queue || !queue.playing) {
-				queue = player.createQueue(interaction.guild, {
-					ytdlOptions: {
-						filter: 'audioonly',
-						highWaterMark: 1 << 30,
-						dlChunkSize: 0,
-						quality: 'highestaudio',
-					},
-					metadata: interaction.channel,
-				});
-			}
+			await interaction.deferReply();
+			const channel = interaction.member.voice.channel;
 
-			const track = await player
-				.search(urlLink, {
-					requestedBy: interaction.user,
-				})
-				.then((x) => x.tracks[0]);
-			if (!track) {
-				return await interaction.followUp({
-					content: `❌ | La musique **${urlLink}** n'a pas été trouvée!`,
-				});
-			}
+			const { track } = await player.play(channel, urlLink, {
+				nodeOptions: {
+					// nodeOptions are the options for guild node (aka your queue in simple word)
+					metadata: interaction, // we can access this metadata object using queue.metadata later on
+				},
+			});
 
+			// const searchResult = await player.search(urlLink, {
+			// 	requestedBy: interaction.user,
+			// });
+
+			// queue.insertTrack(searchResult.tracks[0], 0); // Remember queue index starts from 0, not 1
+			// queue.node.play();
 			if (!interaction.member.voice.channelId) {
 				return await interaction.reply({
-					content: 'You are not in a voice channel!',
+					content: 'Tu n\'es pas dans un salon vocal!',
 					ephemeral: true,
 				});
 			}
@@ -105,7 +112,7 @@ module.exports = {
 					interaction.guild.members.me.voice.channelId
 			) {
 				return await interaction.reply({
-					content: 'You are not in my voice channel!',
+					content: 'Tu n\'es pas dans un salon vocal!',
 					ephemeral: true,
 				});
 			}
@@ -119,25 +126,27 @@ module.exports = {
 			catch {
 				queue.destroy();
 				return await interaction.reply({
-					content: 'Could not join your voice channel!',
+					content: 'Impossible de rejoindre le channel vocal',
 					ephemeral: true,
 				});
 			}
 
-			// const length = queue.length;
-
-			// queue.insert(track, length);
-
-			queue.play(track);
+			// queue.node.play();
 
 			return await interaction.followUp({
 				content: `⏱️ | Et on va jouer... **${track.title}**!`,
+				// content: 'mince',
 			});
 		}
 		if (interaction.options.getSubcommand() === 'queue') {
 			return await interaction.reply('ok');
 		}
 		if (interaction.options.getSubcommand() === 'piste') {
+			return await interaction.reply('ok');
+		}
+		if (interaction.options.getSubcommand() === 'skip') {
+			queue.node.skip();
+
 			return await interaction.reply('ok');
 		}
 		if (interaction.options.getSubcommand() === 'refresh') {
