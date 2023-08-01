@@ -90,54 +90,19 @@ for (const file of eventFiles) {
 }
 
 client.on('messageCreate', async (message) => {
-	if (
-		message.content.endsWith('quoi') ||
-		message.content.endsWith('Quoi') ||
-		message.content.endsWith('quoi?') ||
-		message.content.endsWith('Quoi?') ||
-		message.content.endsWith('Quoi ?') ||
-		message.content.endsWith('quoi ?')
-	) {
-		var ballembed = new EmbedBuilder()
-			.setColor(0x000000)
-			.setDescription('feur')
-			.setImage('https://media.tenor.com/CJIntL3axZUAAAAd/feur-meme.gif');
-		// await message.reply('feur', { embeds: [ballembed] });
-		await message.reply({ embeds: [ballembed] });
-	}
-	if (
-		message.content.endsWith('mais') ||
-		message.content.endsWith('Mais') ||
-		message.content.endsWith('mais?') ||
-		message.content.endsWith('Mais?') ||
-		message.content.endsWith('Mais ?') ||
-		message.content.endsWith('mais ?')
-	) {
-		var ball = new EmbedBuilder()
-			.setColor(0x000000)
-			.setImage(
-				'https://www.sae-cornell.org/180-saecor/archives/house-tour/SAE-house-2005-big.jpg',
-			);
-		// await message.reply('feur', { embeds: [ballembed] });
-		await message.reply({ embeds: [ball] });
-	}
-	if (
-		message.content.endsWith('oui') ||
-		message.content.endsWith('Oui') ||
-		message.content.endsWith('oui?') ||
-		message.content.endsWith('Oui?') ||
-		message.content.endsWith('Oui ?') ||
-		message.content.endsWith('Ui') ||
-		message.content.endsWith('oui ?')
-	) {
-		await message.reply('stiti');
-	}
 	if (message.content.endsWith('vi') || message.content.endsWith('Vi')) {
-		var gfzdqesvf = new EmbedBuilder()
+		var vi = new EmbedBuilder()
 			.setColor(0x000000)
 			.setImage('https://media.tenor.com/BVJezx-7hNwAAAAS/wink-vi.gif');
 		// await message.reply('feur', { embeds: [ballembed] });
-		await message.reply({ embeds: [gfzdqesvf] });
+		await message.reply({ embeds: [vi] });
+	}
+	if (message.content.includes('partie 3') || message.content.includes('part 3') || message.content.includes('part III') || message.content.includes('chapitre 3')) {
+		var partThree = new EmbedBuilder()
+			.setColor(0x000000)
+			.setImage('https://i.pinimg.com/564x/84/a5/35/84a535d1950097cfa65524fee5af2021.jpg');
+		// await message.reply('feur', { embeds: [ballembed] });
+		await message.reply({ embeds: [partThree] });
 	}
 });
 // client.on('messageCreate', (message) => {
