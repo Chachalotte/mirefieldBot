@@ -20,9 +20,7 @@ module.exports = {
 				avatar: avatar,
 			});
 
-			return interaction.reply(
-				`Bienvenue à Mirefield, ${user.pseudo}, ${user.id}`,
-			);
+			return interaction.reply(`Bienvenue à Mirefield, ${user.pseudo}.`);
 		}
 		catch (error) {
 			if (error.name === 'SequelizeUniqueConstraintError') {
@@ -30,7 +28,7 @@ module.exports = {
 			}
 			else {
 				console.log(error);
-				return interaction.reply('Erreur inconnue, désolé, c\'est bête hein ?');
+				return interaction.reply('Erreur inconnue, ouin');
 			}
 		}
 	},

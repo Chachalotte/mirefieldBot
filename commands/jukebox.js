@@ -1,6 +1,6 @@
-const { joinVoiceChannel } = require('@discordjs/voice');
+const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
 const { SlashCommandBuilder } = require('discord.js');
-const { Player } = require('discord-player');
+const { useMasterPlayer, Track, useQueue } = require('discord-player');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -8,12 +8,14 @@ module.exports = {
 		.setDescription('Chercher des musique via youtube / soundcloud ;)')
 		.addSubcommand((subcommand) =>
 			subcommand
-				.setName('song')
-				.setDescription('Loads a single song from a url')
+				.setName('play')
+				.setDescription(
+					'Permets de jouer une musique et l\'ajouter à la queue existante.',
+				)
 				.addStringOption((option) =>
 					option
-						.setName('url')
-						.setDescription('Lien de la musique (Youtube / Soundcloud)')
+						.setName('song_name')
+						.setDescription('Nom de la musique (Youtube / Soundcloud)')
 						.setRequired(true),
 				),
 		)
@@ -32,28 +34,78 @@ module.exports = {
 		)
 		.addSubcommand((subcommand) =>
 			subcommand
-				.setName('search')
-				.setDescription('Chercher une musique')
-				.addStringOption((option) =>
-					option
-						.setName('searchterms')
-						.setDescription('nom du terme')
-						.setRequired(true),
-				),
+				.setName('queue')
+				.setDescription('Afficher la queue de la musique !'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand
+				.setName('piste')
+				.setDescription('Afficher la musique en train d\'être jouée.'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand
+				.setName('refresh')
+				.setDescription('Remettre la playlist à zéro'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand.setName('skip').setDescription('Skip la musique'),
+		)
+		.addSubcommand((subcommand) =>
+			subcommand.setName('pause').setDescription('Pause la musique'),
 		),
 	async execute(interaction) {
-		if (interaction.options.getSubcommand() === 'song') {
-			const urlLink = interaction.options.getString('url') || null;
+		const client = interaction.client;
+		// const player = client.player;
+		const player = useMasterPlayer();
+		player.events.on('connection', (queue) => {
+			queue.dispatcher.voiceConnection.on(
+				'stateChange',
+				(oldState, newState) => {
+					const oldNetworking = Reflect.get(oldState, 'networking');
+					const newNetworking = Reflect.get(newState, 'networking');
 
-			const client = interaction.client;
-			const player = new Player(client);
-			player.on('trackStart', (queue, track) =>
-				queue.metadata.channel.send(`🎶 | Now playing **${track.title}**!`),
+					const networkStateChangeHandler = (
+						oldNetworkState,
+						newNetworkState,
+					) => {
+						const newUdp = Reflect.get(newNetworkState, 'udp');
+						clearInterval(newUdp?.keepAliveInterval);
+					};
+
+					oldNetworking?.off('stateChange', networkStateChangeHandler);
+					newNetworking?.on('stateChange', networkStateChangeHandler);
+				},
 			);
+		});
+		const queue = await client.player.nodes.create(interaction.guild, {
+			metadata: {
+				channel: interaction.channel,
+				client: interaction.guild.members.me,
+				requestedBy: interaction.user,
+			},
+			selfDeaf: true,
+		});
+		if (interaction.options.getSubcommand() === 'play') {
+			const urlLink = interaction.options.getString('song_name') || null;
+			await interaction.deferReply();
+			const channel = interaction.member.voice.channel;
 
+			const { track } = await player.play(channel, urlLink, {
+				nodeOptions: {
+					// nodeOptions are the options for guild node (aka your queue in simple word)
+					metadata: interaction, // we can access this metadata object using queue.metadata later on
+				},
+			});
+
+			// const searchResult = await player.search(urlLink, {
+			// 	requestedBy: interaction.user,
+			// });
+
+			// queue.insertTrack(searchResult.tracks[0], 0); // Remember queue index starts from 0, not 1
+			// queue.node.play();
 			if (!interaction.member.voice.channelId) {
 				return await interaction.reply({
-					content: 'You are not in a voice channel!',
+					content: 'Tu n\'es pas dans un salon vocal!',
 					ephemeral: true,
 				});
 			}
@@ -63,18 +115,10 @@ module.exports = {
 					interaction.guild.members.me.voice.channelId
 			) {
 				return await interaction.reply({
-					content: 'You are not in my voice channel!',
+					content: 'Tu n\'es pas dans un salon vocal!',
 					ephemeral: true,
 				});
 			}
-			const queue = player.createQueue(interaction.guild, {
-				ytdlOptions: {
-					filter: 'audioonly',
-					highWaterMark: 1 << 30,
-					dlChunkSize: 0,
-				},
-				metadata: interaction.channel,
-			});
 
 			// verify vc connection
 			try {
@@ -85,28 +129,43 @@ module.exports = {
 			catch {
 				queue.destroy();
 				return await interaction.reply({
-					content: 'Could not join your voice channel!',
+					content: 'Impossible de rejoindre le channel vocal',
 					ephemeral: true,
 				});
 			}
 
-			await interaction.deferReply();
-			const track = await player
-				.search(urlLink, {
-					requestedBy: interaction.user,
-				})
-				.then((x) => x.tracks[0]);
-			if (!track) {
-				return await interaction.followUp({
-					content: `❌ | Track **${urlLink}** not found!`,
-				});
-			}
-
-			queue.play(track);
+			// queue.node.play();
 
 			return await interaction.followUp({
 				content: `⏱️ | Et on va jouer... **${track.title}**!`,
+				// content: 'mince',
 			});
+		}
+		if (interaction.options.getSubcommand() === 'queue') {
+			const queue = useQueue(interaction.guild.id);
+			const tracks = queue.tracks.toArray(); // Converts the queue into a array of tracks
+			const currentTrack = queue.currentTrack; // Gets the current track being played
+			return await interaction.reply(`${currentTrack}`);
+		}
+		if (interaction.options.getSubcommand() === 'piste') {
+			return await interaction.reply('ok');
+		}
+		if (interaction.options.getSubcommand() === 'skip') {
+			queue.node.skip();
+			return await interaction.reply('La musique en cours a été skip.');
+		}
+		if (interaction.options.getSubcommand() === 'refresh') {
+			queue.delete();
+			return await interaction.reply('La playlist s`est faites détruire');
+		}
+		if (interaction.options.getSubcommand() === 'pause') {
+			queue.node.setPaused(!queue.node.isPaused()); // isPaused() returns true if that player is already paused
+			if (queue.node.isPaused() === true) {
+				return await interaction.reply('Mis en pause');
+			}
+			if (queue.node.isPaused() === false) {
+				return await interaction.reply('Plus en pause');
+			}
 		}
 	},
 };

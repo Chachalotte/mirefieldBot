@@ -1,5 +1,11 @@
 // Require the necessary discord.js classes
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const {
+	Client,
+	GatewayIntentBits,
+	Collection,
+	Events,
+	EmbedBuilder,
+} = require('discord.js');
 const { token } = require('./config.json');
 const fs = require('fs');
 const path = require('path');
@@ -18,7 +24,12 @@ const { Player } = require('discord-player');
 
 // Create a new client instance
 const client = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildVoiceStates,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+	],
 });
 
 // When the client is ready, run this code (only once)
@@ -38,6 +49,10 @@ client.once('ready', () => {
 			console.log(`Logged in as ${client.user.tag}!`);
 		})
 		.catch((err) => console.log(err));
+	const player = new Player(client);
+	client.player = player;
+	exports.client = client;
+	exports.player = player;
 });
 
 client.commands = new Collection();
@@ -68,10 +83,50 @@ for (const file of eventFiles) {
 		client.once(event.name, (...args) => event.execute(...args));
 	}
 	else {
-		client.on(event.name, (...args) => event.execute(...args));
+		client.on(event.name, (...args) => {
+			event.execute(...args);
+		});
 	}
 }
-client.player = new Player(client);
+
+client.on('messageCreate', async (message) => {
+	if (message.content.endsWith('vi') || message.content.endsWith('Vi')) {
+		var vi = new EmbedBuilder()
+			.setColor(0x000000)
+			.setImage('https://media.tenor.com/BVJezx-7hNwAAAAS/wink-vi.gif');
+		// await message.reply('feur', { embeds: [ballembed] });
+		await message.reply({ embeds: [vi] });
+	}
+	if (message.content.includes('partie 3') || message.content.includes('part 3') || message.content.includes('part III') || message.content.includes('chapitre 3')) {
+		var partThree = new EmbedBuilder()
+			.setColor(0x000000)
+			.setImage('https://i.pinimg.com/564x/84/a5/35/84a535d1950097cfa65524fee5af2021.jpg');
+		// await message.reply('feur', { embeds: [ballembed] });
+		await message.reply({ embeds: [partThree] });
+	}
+});
+// client.on('messageCreate', (message) => {
+// 	console.log(message);
+// 	// DON
+// 	if (message.author.id === '212990105923616769') {
+// 		message.react('🚬');
+// 	}
+// 	// if (message..id === '212990105923616769') {
+// 	// 	message.react('🚬');
+// 	// }
+// 	// POM
+// 	// if (message.author.id === '107245766585626624') {
+// 	// 	message.react('🍏');
+// 	// }
+// 	// if (message.author.id === '396348510162780161') {
+// 	// 	message.react('🐔');
+// 	// }
+// 	// if (message.author.id === '242440632885313536') {
+// 	// 	message.react('🚬');
+// 	// }
+// });
+// let's say somebody sent the message `hello`
+
 // Login to Discord with your client's token
 client.login(token);
 
